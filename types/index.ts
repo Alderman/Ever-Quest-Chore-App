@@ -27,14 +27,5 @@ export interface Reward {
   icon?: string;
   cost: number;
   claimedBy?: string;
-  claimedOn?: Date;
-}
-
-export interface AppState {
-  children: Child[];
-  chores: Chore[];
-  rewards: Reward[];
-  currentChildId: string | null;
-  currentChildName: string | null;
-  currentChildXp: number | null;
+  claimedOn?: any;
 }
