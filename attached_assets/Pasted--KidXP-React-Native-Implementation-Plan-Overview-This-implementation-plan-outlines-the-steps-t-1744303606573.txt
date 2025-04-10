@@ -1,0 +1,1040 @@
+# KidXP React Native Implementation Plan
+
+## Overview
+
+This implementation plan outlines the steps to convert the KidXP concept into a React Native application using Expo. The plan prioritizes UI/UX development first, with authentication and database integration planned for later phases.
+
+## Phase 1: Project Setup and Structure
+
+### 1. Initialize Project and Clean Template
+
+**Actions:**
+- Create a new Expo project using the latest template
+- Remove template boilerplate content
+- Set up the basic project structure
+
+**Implementation Details:**
+```bash
+# Create new project
+npx create-expo-app KidXP --template expo-template-blank-typescript
+
+# Navigate to project directory
+cd KidXP
+```
+
+**Files to Modify:**
+- `App.tsx` - Remove template content and replace with basic app structure
+- `app.json` - Update app name, slug, and other configuration details
+
+**Example App.tsx Initial Setup:**
+```typescript
+import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import Navigation from './src/navigation';
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Navigation />
+    </SafeAreaProvider>
+  );
+}
+```
+
+### 2. Project Structure Setup
+
+**Create the following directory structure:**
+```
+src/
+├── components/
+│   ├── cards/
+│   │   ├── ChildCard.tsx
+│   │   └── RewardCard.tsx
+│   ├── dialogs/
+│   │   ├── AddChildDialog.tsx
+│   │   ├── AddChoreDialog.tsx
+│   │   ├── AddRewardDialog.tsx
+│   │   └── PinSetupDialog.tsx
+│   ├── lists/
+│   │   └── ChoreList.tsx
+│   └── layout/
+│       ├── Layout.tsx
+│       └── ChildLayout.tsx
+├── screens/
+│   ├── parent/
+│   │   ├── DashboardScreen.tsx
+│   │   ├── ChoresScreen.tsx
+│   │   └── RewardsScreen.tsx
+│   └── child/
+│       ├── ChildDashboardScreen.tsx
+│       └── ChildRewardsScreen.tsx
+├── navigation/
+│   ├── index.tsx
+│   ├── ParentNavigator.tsx
+│   └── ChildNavigator.tsx
+├── hooks/
+│   └── useAppState.tsx
+├── constants/
+│   ├── Colors.ts
+│   └── Layout.ts
+├── types/
+│   └── index.ts
+└── utils/
+    └── helpers.ts
+```
+
+### 3. Install Essential Dependencies
+
+**Dependencies to install:**
+```bash
+# Navigation
+npm install @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs
+npm install react-native-screens react-native-safe-area-context
+
+# UI Components
+npm install react-native-paper
+npm install react-native-vector-icons
+npx expo install expo-font @expo/vector-icons
+
+# Form handling
+npm install react-hook-form
+
+# Utilities
+npm install date-fns
+```
+
+**Update app.json to include required plugins:**
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow KidXP to access your camera."
+        }
+      ]
+    ]
+  }
+}
+```
+
+## Phase 2: Core Component Implementation
+
+### 1. Define Type Definitions
+
+**File: src/types/index.ts**
+```typescript
+export interface Child {
+  id: string;
+  name: string;
+  xp: number;
+}
+
+export interface Chore {
+  id: string;
+  title: string;
+  description?: string;
+  xp: number;
+  childId: string;
+  isCompleted: boolean;
+  frequency: 'daily' | 'weekly' | 'once';
+  frequencyDays?: number;
+}
+
+export interface Reward {
+  id: string;
+  name: string;
+  icon?: string;
+  cost: number;
+  claimedBy?: string;
+  claimedOn?: Date;
+}
+
+export interface ChoreStats {
+  completed: number;
+  total: number;
+}
+```
+
+### 2. Implement Card Components
+
+**File: src/components/cards/ChildCard.tsx**
+```typescript
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Card, ProgressBar, IconButton } from 'react-native-paper';
+import { Child, ChoreStats } from '../../types';
+
+interface ChildCardProps {
+  child: Child;
+  choreStats?: ChoreStats;
+  nextRewardCost?: number;
+  onViewChores?: () => void;
+  onViewDashboard?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}
+
+const ChildCard: React.FC<ChildCardProps> = ({
+  child,
+  choreStats,
+  nextRewardCost,
+  onViewChores,
+  onViewDashboard,
+  onEdit,
+  onDelete,
+}) => {
+  // Calculate progress percentage for rewards
+  const rewardProgress = nextRewardCost ? Math.min(child.xp / nextRewardCost, 1) : 0;
+  
+  // Calculate chore completion percentage
+  const choreProgress = choreStats ? choreStats.completed / choreStats.total : 0;
+
+  return (
+    <Card style={styles.card}>
+      <Card.Content>
+        <View style={styles.header}>
+          <Text style={styles.name}>{child.name}</Text>
+          <Text style={styles.xp}>{child.xp} XP</Text>
+        </View>
+        
+        {nextRewardCost && (
+          <View style={styles.progressSection}>
+            <Text style={styles.progressLabel}>
+              Next Reward: {child.xp}/{nextRewardCost} XP
+            </Text>
+            <ProgressBar progress={rewardProgress} color="#6366F1" style={styles.progressBar} />
+          </View>
+        )}
+        
+        {choreStats && (
+          <View style={styles.progressSection}>
+            <Text style={styles.progressLabel}>
+              Chores: {choreStats.completed}/{choreStats.total}
+            </Text>
+            <ProgressBar progress={choreProgress} color="#10B981" style={styles.progressBar} />
+          </View>
+        )}
+        
+        <View style={styles.actions}>
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={onViewChores}
+          >
+            <Text style={styles.buttonText}>View Chores</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={onViewDashboard}
+          >
+            <Text style={styles.buttonText}>Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </Card.Content>
+      
+      <Card.Actions style={styles.cardActions}>
+        <IconButton icon="pencil" onPress={onEdit} />
+        <IconButton icon="delete" onPress={onDelete} />
+      </Card.Actions>
+    </Card>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    marginVertical: 8,
+    marginHorizontal: 16,
+    borderRadius: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  name: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  xp: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  progressSection: {
+    marginVertical: 6,
+  },
+  progressLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  button: {
+    backgroundColor: '#6366F1',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flex: 0.48,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  cardActions: {
+    justifyContent: 'flex-end',
+  },
+});
+
+export default ChildCard;
+```
+
+**File: src/components/cards/RewardCard.tsx**
+```typescript
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Card, IconButton } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Reward, Child } from '../../types';
+
+interface RewardCardProps {
+  reward: Reward;
+  children?: Child[];
+  childView?: boolean;
+  childId?: string;
+  childXp?: number;
+  onEditReward?: (rewardId: string) => void;
+  onDeleteReward?: (rewardId: string) => void;
+  onClaimReward?: (rewardId: string) => void;
+}
+
+const RewardCard: React.FC<RewardCardProps> = ({
+  reward,
+  children,
+  childView = false,
+  childId,
+  childXp = 0,
+  onEditReward,
+  onDeleteReward,
+  onClaimReward,
+}) => {
+  const isClaimable = childView && childXp >= reward.cost && !reward.claimedBy;
+  const isClaimed = Boolean(reward.claimedBy);
+  const claimedByChild = children?.find(child => child.id === reward.claimedBy);
+
+  return (
+    <Card style={styles.card}>
+      <Card.Content>
+        <View style={styles.header}>
+          <View style={styles.iconContainer}>
+            <MaterialCommunityIcons 
+              name={reward.icon || "gift"} 
+              size={32} 
+              color="#6366F1" 
+            />
+          </View>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{reward.name}</Text>
+            <Text style={styles.cost}>{reward.cost} XP</Text>
+          </View>
+        </View>
+        
+        {isClaimed && !childView && (
+          <View style={styles.claimedInfo}>
+            <Text style={styles.claimedText}>
+              Claimed by {claimedByChild?.name || 'a child'}
+            </Text>
+          </View>
+        )}
+        
+        {childView && (
+          <TouchableOpacity 
+            style={[
+              styles.claimButton, 
+              !isClaimable && styles.disabledButton
+            ]} 
+            onPress={() => isClaimable && onClaimReward?.(reward.id)}
+            disabled={!isClaimable}
+          >
+            <Text style={styles.claimButtonText}>
+              {isClaimed 
+                ? 'Claimed' 
+                : isClaimable 
+                  ? 'Claim Reward' 
+                  : `Need ${reward.cost - childXp} more XP`}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </Card.Content>
+      
+      {!childView && (
+        <Card.Actions style={styles.cardActions}>
+          <IconButton icon="pencil" onPress={() => onEditReward?.(reward.id)} />
+          <IconButton icon="delete" onPress={() => onDeleteReward?.(reward.id)} />
+        </Card.Actions>
+      )}
+    </Card>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    marginVertical: 8,
+    marginHorizontal: 16,
+    borderRadius: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  cost: {
+    fontSize: 16,
+    color: '#6366F1',
+    fontWeight: '600',
+  },
+  claimedInfo: {
+    backgroundColor: '#F3F4F6',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  claimedText: {
+    color: '#4B5563',
+    fontStyle: 'italic',
+  },
+  claimButton: {
+    backgroundColor: '#6366F1',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  disabledButton: {
+    backgroundColor: '#D1D5DB',
+  },
+  claimButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  cardActions: {
+    justifyContent: 'flex-end',
+  },
+});
+
+export default RewardCard;
+```
+
+### 3. Implement ChoreList Component
+
+**File: src/components/lists/ChoreList.tsx**
+```typescript
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { Card, Checkbox, IconButton, Divider } from 'react-native-paper';
+import { Chore, Child } from '../../types';
+
+interface ChoreListProps {
+  chores: Chore[];
+  children: Child[];
+  showChildColumn?: boolean;
+  onEditChore?: (choreId: string) => void;
+  onDeleteChore?: (choreId: string) => void;
+  onToggleComplete?: (choreId: string, isCompleted: boolean) => void;
+}
+
+const ChoreList: React.FC<ChoreListProps> = ({
+  chores,
+  children,
+  showChildColumn = false,
+  onEditChore,
+  onDeleteChore,
+  onToggleComplete,
+}) => {
+  const getChildName = (childId: string) => {
+    const child = children.find(c => c.id === childId);
+    return child ? child.name : 'Unknown';
+  };
+
+  const renderChoreItem = ({ item }: { item: Chore }) => (
+    <Card style={styles.choreCard}>
+      <Card.Content>
+        <View style={styles.choreHeader}>
+          <View style={styles.checkboxContainer}>
+            <Checkbox
+              status={item.isCompleted ? 'checked' : 'unchecked'}
+              onPress={() => onToggleComplete?.(item.id, !item.isCompleted)}
+            />
+          </View>
+          
+          <View style={styles.choreDetails}>
+            <Text style={[
+              styles.choreTitle,
+              item.isCompleted && styles.completedChore
+            ]}>
+              {item.title}
+            </Text>
+            
+            {item.description && (
+              <Text style={styles.choreDescription}>{item.description}</Text>
+            )}
+            
+            <View style={styles.choreInfo}>
+              {showChildColumn && (
+                <Text style={styles.choreInfoText}>
+                  For: {getChildName(item.childId)}
+                </Text>
+              )}
+              
+              <Text style={styles.choreInfoText}>
+                {item.xp} XP
+              </Text>
+              
+              <Text style={styles.choreInfoText}>
+                {item.frequency === 'once' ? 'One-time' : 
+                 item.frequency === 'daily' ? 'Daily' : 
+                 `Weekly (${item.frequencyDays} days)`}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.choreActions}>
+            <IconButton 
+              icon="pencil" 
+              size={20} 
+              onPress={() => onEditChore?.(item.id)} 
+            />
+            <IconButton 
+              icon="delete" 
+              size={20} 
+              onPress={() => onDeleteChore?.(item.id)} 
+            />
+          </View>
+        </View>
+      </Card.Content>
+    </Card>
+  );
+
+  return (
+    <View style={styles.container}>
+      {chores.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No chores found</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={chores}
+          renderItem={renderChoreItem}
+          keyExtractor={item => item.id}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  choreCard: {
+    marginVertical: 4,
+    marginHorizontal: 16,
+    borderRadius: 8,
+  },
+  choreHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkboxContainer: {
+    marginRight: 8,
+  },
+  choreDetails: {
+    flex: 1,
+  },
+  choreTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  completedChore: {
+    textDecorationLine: 'line-through',
+    color: '#9CA3AF',
+  },
+  choreDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  choreInfo: {
+    flexDirection: 'row',
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
+  choreInfoText: {
+    fontSize: 12,
+    color: '#4B5563',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 8,
+    marginTop: 4,
+  },
+  choreActions: {
+    flexDirection: 'row',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+  emptyState: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+});
+
+export default ChoreList;
+```
+
+### 4. Implement Layout Components
+
+**File: src/components/layout/Layout.tsx**
+```typescript
+import React, { ReactNode } from 'react';
+import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { Appbar } from 'react-native-paper';
+
+interface LayoutProps {
+  children: ReactNode;
+  title: string;
+  showBackButton?: boolean;
+  onBack?: () => void;
+  rightAction?: ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  title,
+  showBackButton = false,
+  onBack,
+  rightAction,
+}) => {
+  return (
+    <SafeAreaView style={styles.container}>
+      <Appbar.Header>
+        {showBackButton && <Appbar.BackAction onPress={onBack} />}
+        <Appbar.Content title={title} />
+        {rightAction}
+      </Appbar.Header>
+      <View style={styles.content}>
+        {children}
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  content: {
+    flex: 1,
+    padding: 8,
+  },
+});
+
+export default Layout;
+```
+
+**File: src/components/layout/ChildLayout.tsx**
+```typescript
+import React, { ReactNode } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import { Appbar } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+interface ChildLayoutProps {
+  children: ReactNode;
+  onBackToParent: () => void;
+  childName?: string;
+  xp?: number;
+}
+
+const ChildLayout: React.FC<ChildLayoutProps> = ({
+  children,
+  onBackToParent,
+  childName = 'Child',
+  xp = 0,
+}) => {
+  return (
+    <SafeAreaView style={styles.container}>
+      <Appbar.Header style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.childName}>{childName}</Text>
+          <View style={styles.xpContainer}>
+            <MaterialCommunityIcons name="star" size={20} color="#F59E0B" />
+            <Text style={styles.xpText}>{xp} XP</Text>
+          </View>
+        </View>
+      </Appbar.Header>
+      
+      <View style={styles.content}>
+        {children}
+      </View>
+      
+      <TouchableOpacity 
+        style={styles.parentButton}
+        onPress={onBackToParent}
+      >
+        <Text style={styles.parentButtonText}>Back to Parent View</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  header: {
+    backgroundColor: '#6366F1',
+  },
+  headerContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  childName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  xpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  xpText: {
+    color: 'white',
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  content: {
+    flex: 1,
+    padding: 8,
+  },
+  parentButton: {
+    backgroundColor: '#4B5563',
+    padding: 12,
+    alignItems: 'center',
+  },
+  parentButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+});
+
+export default ChildLayout;
+```
+
+## Phase 3: Navigation Setup
+
+### 1. Set Up Navigation Structure
+
+**File: src/navigation/index.tsx**
+```typescript
+import React, { useState } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import ParentNavigator from './ParentNavigator';
+import ChildNavigator from './ChildNavigator';
+
+const Navigation = () => {
+  // In a real app, this would be managed by context or state management
+  const [isChildMode, setIsChildMode] = useState(false);
+  const [activeChildId, setActiveChildId] = useState<string | null>(null);
+  const [activeChildName, setActiveChildName] = useState<string>('');
+  const [activeChildXp, setActiveChildXp] = useState<number>(0);
+
+  const switchToChildMode = (childId: string, childName: string, childXp: number) => {
+    setActiveChildId(childId);
+    setActiveChildName(childName);
+    setActiveChildXp(childXp);
+    setIsChildMode(true);
+  };
+
+  const switchToParentMode = () => {
+    setIsChildMode(false);
+  };
+
+  return (
+    <NavigationContainer>
+      {isChildMode ? (
+        <ChildNavigator 
+          childId={activeChildId!}
+          childName={activeChildName}
+          childXp={activeChildXp}
+          onBackToParent={switchToParentMode}
+        />
+      ) : (
+        <ParentNavigator onSwitchToChild={switchToChildMode} />
+      )}
+    </NavigationContainer>
+  );
+};
+
+export default Navigation;
+```
+
+**File: src/navigation/ParentNavigator.tsx**
+```typescript
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+import DashboardScreen from '../screens/parent/DashboardScreen';
+import ChoresScreen from '../screens/parent/ChoresScreen';
+import RewardsScreen from '../screens/parent/RewardsScreen';
+
+const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+interface ParentNavigatorProps {
+  onSwitchToChild: (childId: string, childName: string, childXp: number) => void;
+}
+
+const ParentNavigator: React.FC<ParentNavigatorProps> = ({ onSwitchToChild }) => {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: '#6366F1',
+        tabBarInactiveTintColor: '#9CA3AF',
+        headerShown: false,
+      }}
+    >
+      <Tab.Screen 
+        name="Dashboard" 
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="view-dashboard" color={color} size={size} />
+          ),
+        }}
+      >
+        {() => (
+          <DashboardScreen onSwitchToChild={onSwitchToChild} />
+        )}
+      </Tab.Screen>
+      
+      <Tab.Screen 
+        name="Chores" 
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="clipboard-list" color={color} size={size} />
+          ),
+        }}
+      >
+        {() => (
+          <ChoresScreen />
+        )}
+      </Tab.Screen>
+      
+      <Tab.Screen 
+        name="Rewards" 
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="gift" color={color} size={size} />
+          ),
+        }}
+      >
+        {() => (
+          <RewardsScreen />
+        )}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+};
+
+export default ParentNavigator;
+```
+
+**File: src/navigation/ChildNavigator.tsx**
+```typescript
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+import ChildDashboardScreen from '../screens/child/ChildDashboardScreen';
+import ChildRewardsScreen from '../screens/child/ChildRewardsScreen';
+
+const Tab = createBottomTabNavigator();
+
+interface ChildNavigatorProps {
+  childId: string;
+  childName: string;
+  childXp: number;
+  onBackToParent: () => void;
+}
+
+const ChildNavigator: React.FC<ChildNavigatorProps> = ({
+  childId,
+  childName,
+  childXp,
+  onBackToParent,
+}) => {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: '#6366F1',
+        tabBarInactiveTintColor: '#9CA3AF',
+        headerShown: false,
+      }}
+    >
+      <Tab.Screen 
+        name="ChildDashboard" 
+        options={{
+          tabBarLabel: 'My Chores',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="clipboard-check" color={color} size={size} />
+          ),
+        }}
+      >
+        {() => (
+          <ChildDashboardScreen 
+            childId={childId}
+            childName={childName}
+            childXp={childXp}
+            onBackToParent={onBackToParent}
+          />
+        )}
+      </Tab.Screen>
+      
+      <Tab.Screen 
+        name="ChildRewards" 
+        options={{
+          tabBarLabel: 'Rewards',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="gift" color={color} size={size} />
+          ),
+        }}
+      >
+        {() => (
+          <ChildRewardsScreen 
+            childId={childId}
+            childName={childName}
+            childXp={childXp}
+            onBackToParent={onBackToParent}
+          />
+        )}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+};
+
+export default ChildNavigator;
+```
+
+## Phase 4: Screen Implementation
+
+### 1. Parent Screens
+
+**File: src/screens/parent/DashboardScreen.tsx**
+```typescript
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
+import { FAB } from 'react-native-paper';
+import Layout from '../../components/layout/Layout';
+import ChildCard from '../../components/cards/ChildCard';
+import { Child, ChoreStats } from '../../types';
+
+// Mock data - will be replaced with actual data later
+const MOCK_CHILDREN: Child[] = [
+  { id: '1', name: 'Emma', xp: 120 },
+  { id: '2', name: 'Noah', xp: 85 },
+];
+
+const MOCK_CHORE_STATS: Record<string, ChoreStats> = {
+  '1': { completed: 3, total: 5 },
+  '2': { completed: 2, total: 4 },
+};
+
+const MOCK_NEXT_REWARD_COSTS: Record<string, number> = {
+  '1': 150,
+  '2': 100,
+};
+
+interface DashboardScreenProps {
+  onSwitchToChild: (childId: string, childName: string, childXp: number) => void;
+}
+
+const DashboardScreen: React.FC<DashboardScreenProps> = ({ onSwitchToChild }) => {
+  const [children, setChildren] = useState<Child[]>(MOCK_CHILDREN);
+
+  const handleAddChild = () => {
+    // This will be implemented with a dialog later
+    console.log('Add child');
+  };
+
+  const handleEditChild = (childId: string) => {
+    console.log('Edit child', childId);
+  };
+
+  const handleDeleteChild = (childId: string) => {
+    console.log('Delete child', childId);
+  };
+
+  const handleViewChildDashboard = (child: Child) => {
+    onSwitchToChild(child.id, child.name, child.xp);
+  };
+
+  return (
+    <Layout title="Dashboard">
+      <ScrollView style={styles.container}>
+        <View style={styles.childrenContainer}>
+          {children.map(child => (
+            <ChildCard
+              key={child.id}
+              child={child}
+              choreStats={MOCK_CHORE_STATS[child.id]}
+              nextRewardCost={MOCK_NEXT_REWARD_COSTS[child.id]}
+              onViewChores={() => console.log('View chores for', child.id)}
+              onViewDashboard={() => handleViewChildDashboard(child)}
+              onEdit={() => handleEditChild(child.id)}
+              onDelete={()
