@@ -1,0 +1,602 @@
+# KidXP React Native Implementation Plan - Error Resolution
+
+The error you're encountering is related to navigation setup in Expo Router. The specific error "Attempted to navigate before mounting the Root Layout component" indicates that there's an issue with the navigation structure in your app.
+
+Let's create a simplified, step-by-step implementation plan that focuses on getting the basic structure working first.
+
+## 1. Project Setup with Proper Navigation Structure
+
+### Create app/_layout.tsx (Root Layout)
+```typescript
+import { Stack } from 'expo-router';
+import { PaperProvider } from 'react-native-paper';
+import { AppProvider } from '../context/AppContext';
+
+export default function RootLayout() {
+  return (
+    <PaperProvider>
+      <AppProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="child" options={{ headerShown: false }} />
+        </Stack>
+      </AppProvider>
+    </PaperProvider>
+  );
+}
+```
+
+### Create app/(tabs)/_layout.tsx (Tab Layout)
+```typescript
+import { Tabs } from 'expo-router';
+import { useTheme } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
+
+export default function TabLayout() {
+  const theme = useTheme();
+
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: theme.colors.primary,
+        headerShown: false,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chores"
+        options={{
+          title: 'Chores',
+          tabBarIcon: ({ color }) => <Ionicons name="list" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="rewards"
+        options={{
+          title: 'Rewards',
+          tabBarIcon: ({ color }) => <Ionicons name="gift" size={24} color={color} />,
+        }}
+      />
+    </Tabs>
+  );
+}
+```
+
+### Create app/child/_layout.tsx (Child Layout)
+```typescript
+import { Stack } from 'expo-router';
+
+export default function ChildLayout() {
+  return (
+    <Stack>
+      <Stack.Screen name="dashboard" options={{ headerShown: false }} />
+      <Stack.Screen name="rewards" options={{ headerShown: false }} />
+    </Stack>
+  );
+}
+```
+
+## 2. Create Context for App State
+
+### Create context/AppContext.tsx
+```typescript
+import React, { createContext, useState, useContext } from 'react';
+import { Child, Chore, Reward } from '../types';
+
+// Mock data
+const MOCK_CHILDREN: Child[] = [
+  { id: '1', name: 'Emma', xp: 120 },
+  { id: '2', name: 'Noah', xp: 85 },
+];
+
+const MOCK_CHORES: Chore[] = [
+  { 
+    id: '1', 
+    title: 'Clean Room', 
+    description: 'Make bed and pick up toys', 
+    xp: 20, 
+    childId: '1', 
+    isCompleted: false, 
+    frequency: 'daily' 
+  },
+  { 
+    id: '2', 
+    title: 'Take out Trash', 
+    xp: 10, 
+    childId: '2', 
+    isCompleted: true, 
+    frequency: 'weekly',
+    frequencyDays: 1
+  },
+];
+
+const MOCK_REWARDS: Reward[] = [
+  { id: '1', name: 'Ice Cream', cost: 50 },
+  { id: '2', name: 'Movie Night', cost: 100 },
+];
+
+type AppContextType = {
+  children: Child[];
+  chores: Chore[];
+  rewards: Reward[];
+  currentChildId: string | null;
+  setCurrentChildId: (id: string | null) => void;
+};
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [appChildren, setAppChildren] = useState<Child[]>(MOCK_CHILDREN);
+  const [appChores, setAppChores] = useState<Chore[]>(MOCK_CHORES);
+  const [appRewards, setAppRewards] = useState<Reward[]>(MOCK_REWARDS);
+  const [currentChildId, setCurrentChildId] = useState<string | null>(null);
+
+  return (
+    <AppContext.Provider
+      value={{
+        children: appChildren,
+        chores: appChores,
+        rewards: appRewards,
+        currentChildId,
+        setCurrentChildId,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+}
+
+export function useAppContext() {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+  return context;
+}
+```
+
+## 3. Define Types
+
+### Create types/index.ts
+```typescript
+export interface Child {
+  id: string;
+  name: string;
+  xp: number;
+}
+
+export interface ChoreStats {
+  completed: number;
+  total: number;
+}
+
+export interface Chore {
+  id: string;
+  title: string;
+  description?: string;
+  xp: number;
+  childId: string;
+  isCompleted: boolean;
+  frequency: string;
+  frequencyDays?: number;
+}
+
+export interface Reward {
+  id: string;
+  name: string;
+  icon?: string;
+  cost: number;
+  claimedBy?: string;
+  claimedOn?: any;
+}
+```
+
+## 4. Create Basic Screen Components
+
+### Create app/(tabs)/index.tsx (Dashboard)
+```typescript
+import React from 'react';
+import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Button } from 'react-native-paper';
+import { useAppContext } from '../../context/AppContext';
+
+export default function DashboardScreen() {
+  const { children, setCurrentChildId } = useAppContext();
+  const router = useRouter();
+
+  const handleSwitchToChild = (childId: string) => {
+    setCurrentChildId(childId);
+    router.push('/child/dashboard');
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>KidXP Dashboard</Text>
+      <ScrollView>
+        {children.map(child => (
+          <View key={child.id} style={styles.childCard}>
+            <Text style={styles.childName}>{child.name}</Text>
+            <Text>XP: {child.xp}</Text>
+            <Button 
+              mode="contained" 
+              onPress={() => handleSwitchToChild(child.id)}
+              style={styles.button}
+            >
+              View Dashboard
+            </Button>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  childCard: {
+    padding: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  childName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  button: {
+    marginTop: 8,
+  },
+});
+```
+
+### Create app/(tabs)/chores.tsx
+```typescript
+import React from 'react';
+import { View, StyleSheet, Text, FlatList } from 'react-native';
+import { useAppContext } from '../../context/AppContext';
+
+export default function ChoresScreen() {
+  const { chores, children } = useAppContext();
+
+  const getChildName = (childId: string) => {
+    const child = children.find(c => c.id === childId);
+    return child ? child.name : 'Unknown';
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Chores</Text>
+      <FlatList
+        data={chores}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.choreCard}>
+            <Text style={styles.choreTitle}>{item.title}</Text>
+            <Text>Assigned to: {getChildName(item.childId)}</Text>
+            <Text>XP: {item.xp}</Text>
+            <Text>Status: {item.isCompleted ? 'Completed' : 'Pending'}</Text>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  choreCard: {
+    padding: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  choreTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+});
+```
+
+### Create app/(tabs)/rewards.tsx
+```typescript
+import React from 'react';
+import { View, StyleSheet, Text, FlatList } from 'react-native';
+import { useAppContext } from '../../context/AppContext';
+
+export default function RewardsScreen() {
+  const { rewards } = useAppContext();
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Rewards</Text>
+      <FlatList
+        data={rewards}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.rewardCard}>
+            <Text style={styles.rewardName}>{item.name}</Text>
+            <Text>Cost: {item.cost} XP</Text>
+            <Text>Status: {item.claimedBy ? 'Claimed' : 'Available'}</Text>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  rewardCard: {
+    padding: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  rewardName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+});
+```
+
+### Create app/child/dashboard.tsx
+```typescript
+import React from 'react';
+import { View, StyleSheet, Text, ScrollView } from 'react-native';
+import { Button } from 'react-native-paper';
+import { useRouter } from 'expo-router';
+import { useAppContext } from '../../context/AppContext';
+
+export default function ChildDashboardScreen() {
+  const { children, currentChildId, chores, setCurrentChildId } = useAppContext();
+  const router = useRouter();
+
+  const currentChild = children.find(child => child.id === currentChildId);
+  const childChores = chores.filter(chore => chore.childId === currentChildId);
+
+  const handleBackToParent = () => {
+    setCurrentChildId(null);
+    router.push('/');
+  };
+
+  if (!currentChild) {
+    return (
+      <View style={styles.container}>
+        <Text>No child selected</Text>
+        <Button onPress={handleBackToParent}>Back to Parent View</Button>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{currentChild.name}'s Dashboard</Text>
+        <Button onPress={handleBackToParent}>Back to Parent View</Button>
+      </View>
+      
+      <View style={styles.statsCard}>
+        <Text style={styles.statsTitle}>XP: {currentChild.xp}</Text>
+      </View>
+      
+      <Text style={styles.sectionTitle}>My Chores</Text>
+      <ScrollView>
+        {childChores.map(chore => (
+          <View key={chore.id} style={styles.choreCard}>
+            <Text style={styles.choreTitle}>{chore.title}</Text>
+            <Text>XP: {chore.xp}</Text>
+            <Text>Status: {chore.isCompleted ? 'Completed' : 'Pending'}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      
+      <Button 
+        mode="contained" 
+        onPress={() => router.push('/child/rewards')}
+        style={styles.button}
+      >
+        View Rewards
+      </Button>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  statsCard: {
+    padding: 16,
+    backgroundColor: '#e0f7fa',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginVertical: 8,
+  },
+  choreCard: {
+    padding: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  choreTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  button: {
+    marginTop: 16,
+  },
+});
+```
+
+### Create app/child/rewards.tsx
+```typescript
+import React from 'react';
+import { View, StyleSheet, Text, FlatList } from 'react-native';
+import { Button } from 'react-native-paper';
+import { useRouter } from 'expo-router';
+import { useAppContext } from '../../context/AppContext';
+
+export default function ChildRewardsScreen() {
+  const { rewards, children, currentChildId } = useAppContext();
+  const router = useRouter();
+
+  const currentChild = children.find(child => child.id === currentChildId);
+
+  if (!currentChild) {
+    return (
+      <View style={styles.container}>
+        <Text>No child selected</Text>
+        <Button onPress={() => router.push('/')}>Back to Parent View</Button>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{currentChild.name}'s Rewards</Text>
+        <Button onPress={() => router.back()}>Back</Button>
+      </View>
+      
+      <View style={styles.statsCard}>
+        <Text style={styles.statsTitle}>Available XP: {currentChild.xp}</Text>
+      </View>
+      
+      <FlatList
+        data={rewards}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.rewardCard}>
+            <Text style={styles.rewardName}>{item.name}</Text>
+            <Text>Cost: {item.cost} XP</Text>
+            <Button 
+              mode="contained" 
+              disabled={item.cost > currentChild.xp || !!item.claimedBy}
+              style={styles.button}
+            >
+              {item.claimedBy ? 'Claimed' : 'Claim Reward'}
+            </Button>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  statsCard: {
+    padding: 16,
+    backgroundColor: '#e0f7fa',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  rewardCard: {
+    padding: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  rewardName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  button: {
+    marginTop: 8,
+  },
+});
+```
+
+## 5. Update package.json Dependencies
+
+Ensure you have the following dependencies:
+```json
+"dependencies": {
+  "expo": "~49.0.0",
+  "expo-router": "^2.0.0",
+  "expo-status-bar": "~1.6.0",
+  "react": "18.2.0",
+  "react-native": "0.72.6",
+  "react-native-paper": "^5.11.1",
+  "react-native-safe-area-context": "4.6.3",
+  "react-native-screens": "~3.22.0",
+  "@expo/vector-icons": "^13.0.0"
+}
+```
+
+## Implementation Notes
+
+1. This implementation uses a simplified approach with Expo Router's file-based routing system.
+2. We're using React Native Paper for UI components.
+3. The app state is managed through a context provider.
+4. Navigation between parent and child views is handled by setting the current child ID in context and navigating to the appropriate route.
+5. We're using mock data for now, which can be replaced with actual API calls or local storage later.
+
+This simplified implementation should resolve the navigation errors you were encountering. The key was ensuring that the root layout properly sets up the navigation structure with Stack components before any navigation attempts occur.
