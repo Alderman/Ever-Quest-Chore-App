@@ -1,7 +1,7 @@
+import React, { createContext, useContext, useState } from 'react';
+import { AppState, Child, Chore, Reward } from '../types';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-
-// Define types
+// Define types (from the original file, moved to types.ts)
 export interface Child {
   id: string;
   name: string;
@@ -28,331 +28,215 @@ export interface Reward {
   claimedOn?: Date;
 }
 
-export interface ChoreStats {
-  completed: number;
-  total: number;
-}
 
-interface AppContextType {
-  // Child management
-  children: Child[];
-  addChild: (child: Omit<Child, 'id'>) => void;
-  updateChild: (id: string, child: Partial<Child>) => void;
-  deleteChild: (id: string) => void;
-  
-  // Chore management
-  chores: Chore[];
-  addChore: (chore: Omit<Chore, 'id'>) => void;
-  updateChore: (id: string, chore: Partial<Chore>) => void;
-  deleteChore: (id: string) => void;
-  toggleChoreCompletion: (id: string, isCompleted: boolean) => void;
-  
-  // Reward management
-  rewards: Reward[];
-  addReward: (reward: Omit<Reward, 'id'>) => void;
-  updateReward: (id: string, reward: Partial<Reward>) => void;
-  deleteReward: (id: string) => void;
-  claimReward: (rewardId: string, childId: string) => void;
-  
-  // Child view state
-  isChildMode: boolean;
-  activeChildId: string | null;
-  activeChildName: string;
-  activeChildXp: number;
-  switchToChildMode: (childId: string, childName: string, childXp: number) => void;
-  switchToParentMode: () => void;
-  
-  // Helper functions
-  getChoreStats: (childId: string) => ChoreStats;
-  getNextRewardCost: (childId: string) => number | null;
-}
-
-// Create context with default values
-const AppContext = createContext<AppContextType>({
-  children: [],
-  addChild: () => {},
-  updateChild: () => {},
-  deleteChild: () => {},
-  
-  chores: [],
-  addChore: () => {},
-  updateChore: () => {},
-  deleteChore: () => {},
-  toggleChoreCompletion: () => {},
-  
-  rewards: [],
-  addReward: () => {},
-  updateReward: () => {},
-  deleteReward: () => {},
-  claimReward: () => {},
-  
-  isChildMode: false,
-  activeChildId: null,
-  activeChildName: '',
-  activeChildXp: 0,
-  switchToChildMode: () => {},
-  switchToParentMode: () => {},
-  
-  getChoreStats: () => ({ completed: 0, total: 0 }),
-  getNextRewardCost: () => null,
-});
-
-// Mock initial data for development
+// Mock data for initial development (from edited code)
 const MOCK_CHILDREN: Child[] = [
   { id: '1', name: 'Emma', xp: 120 },
   { id: '2', name: 'Noah', xp: 85 },
 ];
 
 const MOCK_CHORES: Chore[] = [
-  { 
-    id: '1', 
-    title: 'Clean bedroom', 
-    description: 'Make bed and put away toys', 
-    xp: 20, 
-    childId: '1', 
-    isCompleted: false, 
-    frequency: 'daily' 
-  },
-  { 
-    id: '2', 
-    title: 'Take out trash', 
-    xp: 15, 
-    childId: '1', 
-    isCompleted: true, 
-    frequency: 'weekly',
-    frequencyDays: 2
-  },
-  { 
-    id: '3', 
-    title: 'Homework', 
-    description: 'Complete math worksheet', 
-    xp: 30, 
-    childId: '2', 
-    isCompleted: false, 
-    frequency: 'daily' 
-  },
+  { id: '1', title: 'Clean room', xp: 20, childId: '1', isCompleted: false, frequency: 'daily' },
+  { id: '2', title: 'Take out trash', xp: 15, childId: '2', isCompleted: true, frequency: 'daily' },
+  { id: '3', title: 'Do homework', xp: 30, childId: '1', isCompleted: false, frequency: 'daily' },
 ];
 
 const MOCK_REWARDS: Reward[] = [
-  {
-    id: '1',
-    name: 'Extra screen time',
-    icon: 'tablet',
-    cost: 50,
-  },
-  {
-    id: '2',
-    name: 'Ice cream trip',
-    icon: 'ice-cream',
-    cost: 150,
-  },
-  {
-    id: '3',
-    name: 'New toy',
-    icon: 'toy-brick',
-    cost: 200,
-    claimedBy: '1',
-    claimedOn: new Date(),
-  },
+  { id: '1', name: 'Ice cream', icon: '🍦', cost: 50 },
+  { id: '2', name: 'Movie night', icon: '🎬', cost: 100 },
+  { id: '3', name: 'Video game time', icon: '🎮', cost: 75 },
 ];
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State
-  const [childrenState, setChildrenState] = useState<Child[]>(MOCK_CHILDREN);
-  const [choresState, setChoresState] = useState<Chore[]>(MOCK_CHORES);
-  const [rewardsState, setRewardsState] = useState<Reward[]>(MOCK_REWARDS);
-  
-  // Child view state
-  const [isChildMode, setIsChildMode] = useState(false);
-  const [activeChildId, setActiveChildId] = useState<string | null>(null);
-  const [activeChildName, setActiveChildName] = useState<string>('');
-  const [activeChildXp, setActiveChildXp] = useState<number>(0);
-  
-  // Child management
-  const addChild = (child: Omit<Child, 'id'>) => {
-    const newChild = {
-      ...child,
-      id: Date.now().toString(), // Simple ID generation
+interface AppContextType {
+  state: AppState;
+  addChild: (name: string) => void;
+  updateChild: (id: string, data: Partial<Child>) => void;
+  deleteChild: (id: string) => void;
+  addChore: (chore: Omit<Chore, 'id'>) => void;
+  updateChore: (id: string, data: Partial<Chore>) => void;
+  deleteChore: (id: string) => void;
+  completeChore: (id: string) => void;
+  addReward: (reward: Omit<Reward, 'id'>) => void;
+  updateReward: (id: string, data: Partial<Reward>) => void;
+  deleteReward: (id: string) => void;
+  claimReward: (rewardId: string, childId: string) => void;
+  switchToChild: (childId: string, childName: string, childXp: number) => void;
+  switchToParent: () => void;
+}
+
+const initialState: AppState = {
+  children: MOCK_CHILDREN,
+  chores: MOCK_CHORES,
+  rewards: MOCK_REWARDS,
+  currentChildId: null,
+  currentChildName: null,
+  currentChildXp: null,
+};
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<AppState>(initialState);
+
+  const addChild = (name: string) => {
+    const newChild: Child = {
+      id: Date.now().toString(),
+      name,
+      xp: 0,
     };
-    setChildrenState([...childrenState, newChild]);
+    setState(prev => ({
+      ...prev,
+      children: [...prev.children, newChild],
+    }));
   };
-  
-  const updateChild = (id: string, childUpdates: Partial<Child>) => {
-    setChildrenState(
-      childrenState.map(child => 
-        child.id === id ? { ...child, ...childUpdates } : child
-      )
-    );
+
+  const updateChild = (id: string, data: Partial<Child>) => {
+    setState(prev => ({
+      ...prev,
+      children: prev.children.map(child =>
+        child.id === id ? { ...child, ...data } : child
+      ),
+    }));
   };
-  
+
   const deleteChild = (id: string) => {
-    setChildrenState(childrenState.filter(child => child.id !== id));
+    setState(prev => ({
+      ...prev,
+      children: prev.children.filter(child => child.id !== id),
+      chores: prev.chores.filter(chore => chore.childId !== id),
+    }));
   };
-  
-  // Chore management
+
   const addChore = (chore: Omit<Chore, 'id'>) => {
-    const newChore = {
+    const newChore: Chore = {
       ...chore,
       id: Date.now().toString(),
     };
-    setChoresState([...choresState, newChore]);
+    setState(prev => ({
+      ...prev,
+      chores: [...prev.chores, newChore],
+    }));
   };
-  
-  const updateChore = (id: string, choreUpdates: Partial<Chore>) => {
-    setChoresState(
-      choresState.map(chore => 
-        chore.id === id ? { ...chore, ...choreUpdates } : chore
-      )
-    );
+
+  const updateChore = (id: string, data: Partial<Chore>) => {
+    setState(prev => ({
+      ...prev,
+      chores: prev.chores.map(chore =>
+        chore.id === id ? { ...chore, ...data } : chore
+      ),
+    }));
   };
-  
+
   const deleteChore = (id: string) => {
-    setChoresState(choresState.filter(chore => chore.id !== id));
+    setState(prev => ({
+      ...prev,
+      chores: prev.chores.filter(chore => chore.id !== id),
+    }));
   };
-  
-  const toggleChoreCompletion = (id: string, isCompleted: boolean) => {
-    const chore = choresState.find(c => c.id === id);
-    if (chore) {
-      setChoresState(
-        choresState.map(c => 
-          c.id === id ? { ...c, isCompleted } : c
-        )
-      );
-      
-      // If completing a chore, award XP to the child
-      if (isCompleted && !chore.isCompleted) {
-        const childToUpdate = childrenState.find(child => child.id === chore.childId);
-        if (childToUpdate) {
-          updateChild(childToUpdate.id, { xp: childToUpdate.xp + chore.xp });
-          
-          // Update active child XP if in child mode
-          if (isChildMode && activeChildId === childToUpdate.id) {
-            setActiveChildXp(childToUpdate.xp + chore.xp);
-          }
-        }
-      }
-      
-      // If uncompleting a chore, remove XP from the child
-      if (!isCompleted && chore.isCompleted) {
-        const childToUpdate = childrenState.find(child => child.id === chore.childId);
-        if (childToUpdate) {
-          updateChild(childToUpdate.id, { xp: Math.max(0, childToUpdate.xp - chore.xp) });
-          
-          // Update active child XP if in child mode
-          if (isChildMode && activeChildId === childToUpdate.id) {
-            setActiveChildXp(Math.max(0, childToUpdate.xp - chore.xp));
-          }
-        }
-      }
+
+  const completeChore = (id: string) => {
+    const chore = state.chores.find(c => c.id === id);
+    if (!chore) return;
+
+    // Mark chore as completed
+    updateChore(id, { isCompleted: true });
+
+    // Add XP to child
+    const child = state.children.find(c => c.id === chore.childId);
+    if (child) {
+      updateChild(child.id, { xp: child.xp + chore.xp });
     }
   };
-  
-  // Reward management
+
   const addReward = (reward: Omit<Reward, 'id'>) => {
-    const newReward = {
+    const newReward: Reward = {
       ...reward,
       id: Date.now().toString(),
     };
-    setRewardsState([...rewardsState, newReward]);
+    setState(prev => ({
+      ...prev,
+      rewards: [...prev.rewards, newReward],
+    }));
   };
-  
-  const updateReward = (id: string, rewardUpdates: Partial<Reward>) => {
-    setRewardsState(
-      rewardsState.map(reward => 
-        reward.id === id ? { ...reward, ...rewardUpdates } : reward
-      )
-    );
+
+  const updateReward = (id: string, data: Partial<Reward>) => {
+    setState(prev => ({
+      ...prev,
+      rewards: prev.rewards.map(reward =>
+        reward.id === id ? { ...reward, ...data } : reward
+      ),
+    }));
   };
-  
+
   const deleteReward = (id: string) => {
-    setRewardsState(rewardsState.filter(reward => reward.id !== id));
+    setState(prev => ({
+      ...prev,
+      rewards: prev.rewards.filter(reward => reward.id !== id),
+    }));
   };
-  
+
   const claimReward = (rewardId: string, childId: string) => {
-    const reward = rewardsState.find(r => r.id === rewardId);
-    const child = childrenState.find(c => c.id === childId);
-    
-    if (reward && child && child.xp >= reward.cost && !reward.claimedBy) {
-      // Update the reward
-      updateReward(rewardId, {
-        claimedBy: childId,
-        claimedOn: new Date(),
-      });
-      
-      // Deduct XP from child
-      updateChild(childId, { xp: child.xp - reward.cost });
-      
-      // Update active child XP if in child mode
-      if (isChildMode && activeChildId === childId) {
-        setActiveChildXp(child.xp - reward.cost);
-      }
-    }
+    const reward = state.rewards.find(r => r.id === rewardId);
+    const child = state.children.find(c => c.id === childId);
+
+    if (!reward || !child || child.xp < reward.cost) return;
+
+    // Update reward as claimed
+    updateReward(rewardId, {
+      claimedBy: childId,
+      claimedOn: new Date(),
+    });
+
+    // Deduct XP from child
+    updateChild(childId, { xp: child.xp - reward.cost });
   };
-  
-  // Child view management
-  const switchToChildMode = (childId: string, childName: string, childXp: number) => {
-    setActiveChildId(childId);
-    setActiveChildName(childName);
-    setActiveChildXp(childXp);
-    setIsChildMode(true);
+
+  const switchToChild = (childId: string, childName: string, childXp: number) => {
+    setState(prev => ({
+      ...prev,
+      currentChildId: childId,
+      currentChildName: childName,
+      currentChildXp: childXp,
+    }));
   };
-  
-  const switchToParentMode = () => {
-    setIsChildMode(false);
+
+  const switchToParent = () => {
+    setState(prev => ({
+      ...prev,
+      currentChildId: null,
+      currentChildName: null,
+      currentChildXp: null,
+    }));
   };
-  
-  // Helper functions
-  const getChoreStats = (childId: string): ChoreStats => {
-    const childChores = choresState.filter(chore => chore.childId === childId);
-    const completed = childChores.filter(chore => chore.isCompleted).length;
-    const total = childChores.length;
-    
-    return { completed, total };
-  };
-  
-  const getNextRewardCost = (childId: string): number | null => {
-    const availableRewards = rewardsState
-      .filter(reward => !reward.claimedBy)
-      .sort((a, b) => a.cost - b.cost);
-    
-    const child = childrenState.find(c => c.id === childId);
-    if (!child) return null;
-    
-    // Find the cheapest reward the child can't yet afford
-    const nextReward = availableRewards.find(reward => reward.cost > child.xp);
-    return nextReward ? nextReward.cost : null;
-  };
-  
-  const value = {
-    children: childrenState,
-    addChild,
-    updateChild,
-    deleteChild,
-    
-    chores: choresState,
-    addChore,
-    updateChore,
-    deleteChore,
-    toggleChoreCompletion,
-    
-    rewards: rewardsState,
-    addReward,
-    updateReward,
-    deleteReward,
-    claimReward,
-    
-    isChildMode,
-    activeChildId,
-    activeChildName,
-    activeChildXp,
-    switchToChildMode,
-    switchToParentMode,
-    
-    getChoreStats,
-    getNextRewardCost,
-  };
-  
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+
+  return (
+    <AppContext.Provider
+      value={{
+        state,
+        addChild,
+        updateChild,
+        deleteChild,
+        addChore,
+        updateChore,
+        deleteChore,
+        completeChore,
+        addReward,
+        updateReward,
+        deleteReward,
+        claimReward,
+        switchToChild,
+        switchToParent,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
 };
 
-export const useAppContext = () => useContext(AppContext);
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+  return context;
+};

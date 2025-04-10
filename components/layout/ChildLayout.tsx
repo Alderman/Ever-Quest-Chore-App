@@ -1,44 +1,41 @@
-
-import React, { ReactNode } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
-import { Appbar } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from 'react';
+import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { Appbar, Text, Avatar, useTheme } from 'react-native-paper';
+import { useAppContext } from '../../context/AppContext';
+import { useRouter } from 'expo-router';
 
 interface ChildLayoutProps {
-  children: ReactNode;
-  onBackToParent: () => void;
-  childName?: string;
-  xp?: number;
+  children: React.ReactNode;
+  title: string;
 }
 
-const ChildLayout: React.FC<ChildLayoutProps> = ({
-  children,
-  onBackToParent,
-  childName = 'Child',
-  xp = 0,
-}) => {
+const ChildLayout: React.FC<ChildLayoutProps> = ({ children, title }) => {
+  const { state, switchToParent } = useAppContext();
+  const theme = useTheme();
+  const router = useRouter();
+
+  const handleBack = () => {
+    switchToParent();
+    router.replace('/(tabs)');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <Appbar.Header style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.childName}>{childName}</Text>
+      <Appbar.Header>
+        <Appbar.BackAction onPress={handleBack} />
+        <Appbar.Content title={title} />
+        <View style={styles.childInfo}>
+          <Text variant="labelLarge">{state.currentChildName}</Text>
           <View style={styles.xpContainer}>
-            <MaterialCommunityIcons name="star" size={20} color="#F59E0B" />
-            <Text style={styles.xpText}>{xp} XP</Text>
+            <Text style={{ color: theme.colors.primary }}>
+              {state.currentChildXp} XP
+            </Text>
           </View>
         </View>
       </Appbar.Header>
-      
       <View style={styles.content}>
         {children}
       </View>
-      
-      <TouchableOpacity 
-        style={styles.parentButton}
-        onPress={onBackToParent}
-      >
-        <Text style={styles.parentButtonText}>Back to Parent View</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -46,48 +43,21 @@ const ChildLayout: React.FC<ChildLayoutProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    backgroundColor: '#6366F1',
-  },
-  headerContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  childName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  xpContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  xpText: {
-    color: 'white',
-    fontWeight: 'bold',
-    marginLeft: 4,
   },
   content: {
     flex: 1,
-    padding: 8,
+    padding: 16,
   },
-  parentButton: {
-    backgroundColor: '#4B5563',
-    padding: 12,
+  childInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  parentButtonText: {
-    color: 'white',
-    fontWeight: '600',
+  xpContainer: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: 'rgba(98, 0, 238, 0.1)',
   },
 });
 
