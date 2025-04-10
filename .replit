@@ -53,5 +53,3 @@ args = "npx eas build --platform android --profile preview"
 
 [deployment]
 deploymentTarget = "cloudrun"
-run = ["sh", "-c", "npx expo start --web --port 8081 --non-interactive --no-dev"]
-build = ["sh", "-c", "npx expo install"]
